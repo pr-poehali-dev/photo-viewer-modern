@@ -3,9 +3,16 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import ViewModeSelector from "@/components/ViewModeSelector";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, Upload, ImageIcon } from "lucide-react";
+import { ChevronLeft, Upload, ImageIcon, Trash2, Pencil } from "lucide-react";
 import { Photo, ViewMode, Album } from "@/types";
-import { getPhotosByAlbumId, getAlbums, addPhotoToAlbum } from "@/data/mockData";
+import { 
+  getPhotosByAlbumId, 
+  getAlbums, 
+  addPhotoToAlbum, 
+  deletePhoto, 
+  updatePhotoTitle 
+} from "@/data/mockData";
+import { Input } from "@/components/ui/input";
 
 const AlbumPage = () => {
   const { albumId } = useParams<{ albumId: string }>();
@@ -15,6 +22,8 @@ const AlbumPage = () => {
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
 
   useEffect(() => {
     if (albumId) {
@@ -67,70 +76,197 @@ const AlbumPage = () => {
     fileInputRef.current?.click();
   };
 
+  const handleDeletePhoto = (e: React.MouseEvent, photoId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (albumId && window.confirm("Вы уверены, что хотите удалить эту фотографию?")) {
+      deletePhoto(albumId, photoId);
+      loadAlbumData();
+    }
+  };
+
+  const startEditPhotoTitle = (e: React.MouseEvent, photo: Photo) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditingPhotoId(photo.id);
+    setEditingTitle(photo.title);
+  };
+
+  const savePhotoTitle = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (albumId && editingPhotoId && editingTitle.trim()) {
+      updatePhotoTitle(albumId, editingPhotoId, editingTitle.trim());
+      setEditingPhotoId(null);
+      loadAlbumData();
+    }
+  };
+
   const renderPhotoGrid = () => {
     if (viewMode === "grid") {
       return (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+        <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-5 gap-1">
           {photos.map(photo => (
-            <Link to={`/album/${albumId}/photo/${photo.id}`} key={photo.id} className="group">
-              <div className="relative aspect-square rounded-sm overflow-hidden">
-                <img 
-                  src={photo.url} 
-                  alt={photo.title} 
-                  className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                  <div className="p-2 w-full">
-                    <h3 className="text-white text-sm truncate">{photo.title}</h3>
+            <div key={photo.id} className="space-y-1">
+              <Link to={`/album/${albumId}/photo/${photo.id}`} className="group">
+                <div className="relative aspect-[10/15] rounded-sm overflow-hidden">
+                  <img 
+                    src={photo.url} 
+                    alt={photo.title} 
+                    className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 flex items-end justify-between p-2 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <button
+                      onClick={(e) => startEditPhotoTitle(e, photo)}
+                      className="bg-white/20 backdrop-blur-sm p-1 rounded hover:bg-white/40 transition-colors"
+                    >
+                      <Pencil className="h-4 w-4 text-white" />
+                    </button>
+                    <button 
+                      onClick={(e) => handleDeletePhoto(e, photo.id)}
+                      className="bg-white/20 backdrop-blur-sm p-1 rounded hover:bg-white/40 transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4 text-white" />
+                    </button>
                   </div>
                 </div>
-              </div>
-            </Link>
+              </Link>
+              {editingPhotoId === photo.id ? (
+                <form onSubmit={savePhotoTitle} className="flex items-center gap-1">
+                  <Input 
+                    type="text" 
+                    value={editingTitle}
+                    onChange={(e) => setEditingTitle(e.target.value)}
+                    className="h-7 text-xs"
+                    autoFocus
+                  />
+                  <Button 
+                    type="submit" 
+                    size="sm" 
+                    className="h-7 px-2 text-xs"
+                  >
+                    OK
+                  </Button>
+                </form>
+              ) : (
+                <p className="text-xs truncate px-1">{photo.title}</p>
+              )}
+            </div>
           ))}
         </div>
       );
     } else if (viewMode === "masonry") {
       return (
-        <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 gap-2 space-y-2">
+        <div className="columns-2 sm:columns-3 md:columns-3 lg:columns-5 gap-1 space-y-1">
           {photos.map(photo => (
-            <Link to={`/album/${albumId}/photo/${photo.id}`} key={photo.id} className="block group">
-              <div className="relative overflow-hidden rounded-sm break-inside-avoid">
-                <img 
-                  src={photo.url} 
-                  alt={photo.title} 
-                  className="w-full h-auto transition-transform duration-200 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                  <div className="p-2 w-full">
-                    <h3 className="text-white text-sm truncate">{photo.title}</h3>
+            <div key={photo.id} className="mb-1 break-inside-avoid">
+              <Link to={`/album/${albumId}/photo/${photo.id}`} className="group block">
+                <div className="relative overflow-hidden rounded-sm">
+                  <img 
+                    src={photo.url} 
+                    alt={photo.title} 
+                    className="w-full h-auto transition-transform duration-200 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 flex items-end justify-between p-2 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <button
+                      onClick={(e) => startEditPhotoTitle(e, photo)}
+                      className="bg-white/20 backdrop-blur-sm p-1 rounded hover:bg-white/40 transition-colors"
+                    >
+                      <Pencil className="h-4 w-4 text-white" />
+                    </button>
+                    <button 
+                      onClick={(e) => handleDeletePhoto(e, photo.id)}
+                      className="bg-white/20 backdrop-blur-sm p-1 rounded hover:bg-white/40 transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4 text-white" />
+                    </button>
                   </div>
                 </div>
-              </div>
-            </Link>
+              </Link>
+              {editingPhotoId === photo.id ? (
+                <form onSubmit={savePhotoTitle} className="flex items-center gap-1 mt-1">
+                  <Input 
+                    type="text" 
+                    value={editingTitle}
+                    onChange={(e) => setEditingTitle(e.target.value)}
+                    className="h-7 text-xs"
+                    autoFocus
+                  />
+                  <Button 
+                    type="submit" 
+                    size="sm" 
+                    className="h-7 px-2 text-xs"
+                  >
+                    OK
+                  </Button>
+                </form>
+              ) : (
+                <p className="text-xs truncate px-1 mt-1">{photo.title}</p>
+              )}
+            </div>
           ))}
         </div>
       );
     } else {
       return (
-        <div className="flex flex-col space-y-2">
+        <div className="flex flex-col space-y-1">
           {photos.map(photo => (
-            <Link to={`/album/${albumId}/photo/${photo.id}`} key={photo.id} className="group">
-              <div className="flex items-center p-2 rounded-md hover:bg-secondary/60">
-                <div className="w-16 h-16 rounded overflow-hidden mr-3">
-                  <img 
-                    src={photo.url} 
-                    alt={photo.title} 
-                    className="w-full h-full object-cover"
-                  />
+            <div key={photo.id}>
+              <Link to={`/album/${albumId}/photo/${photo.id}`} className="group">
+                <div className="flex items-center p-2 rounded-md hover:bg-secondary/60">
+                  <div className="w-16 h-16 rounded overflow-hidden mr-3">
+                    <img 
+                      src={photo.url} 
+                      alt={photo.title} 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    {editingPhotoId === photo.id ? (
+                      <form onSubmit={savePhotoTitle} className="flex items-center gap-1">
+                        <Input 
+                          type="text" 
+                          value={editingTitle}
+                          onChange={(e) => setEditingTitle(e.target.value)}
+                          className="h-7 text-xs"
+                          autoFocus
+                        />
+                        <Button 
+                          type="submit" 
+                          size="sm" 
+                          className="h-7 px-2 text-xs"
+                        >
+                          OK
+                        </Button>
+                      </form>
+                    ) : (
+                      <h3 className="font-medium">{photo.title}</h3>
+                    )}
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(photo.timestamp).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8" 
+                      onClick={(e) => startEditPhotoTitle(e, photo)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-destructive hover:text-destructive" 
+                      onClick={(e) => handleDeletePhoto(e, photo.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-medium">{photo.title}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {new Date(photo.timestamp).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-            </Link>
+              </Link>
+            </div>
           ))}
         </div>
       );
@@ -142,9 +278,9 @@ const AlbumPage = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <Navigation />
-      <main className="flex-1 container px-4 py-6">
-        <div className="mb-6">
-          <Button variant="ghost" onClick={() => navigate("/")} className="mb-4">
+      <main className="flex-1 container px-2 py-4">
+        <div className="mb-4">
+          <Button variant="ghost" onClick={() => navigate("/")} className="mb-2">
             <ChevronLeft className="mr-2 h-4 w-4" />
             Назад к альбомам
           </Button>
@@ -154,7 +290,7 @@ const AlbumPage = () => {
           </p>
         </div>
         
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
           <div className="flex gap-2">
             <Button onClick={uploadButtonClick} disabled={isUploading}>
               <Upload className="h-4 w-4 mr-2" />
