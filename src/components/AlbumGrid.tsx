@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Album } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { PlusIcon, TrashIcon } from "lucide-react";
-import { addAlbum, deleteAlbum } from "@/data/mockData";
+import { PlusIcon, TrashIcon, EditIcon } from "lucide-react";
+import { addAlbum, deleteAlbum, updateAlbumTitle } from "@/data/mockData";
 
 interface AlbumGridProps {
   albums: Album[];
@@ -13,16 +13,13 @@ interface AlbumGridProps {
 }
 
 const AlbumGrid = ({ albums, onAlbumsChange }: AlbumGridProps) => {
-  const [newAlbumTitle, setNewAlbumTitle] = useState("");
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [currentAlbum, setCurrentAlbum] = useState<Album | null>(null);
+  const [editAlbumTitle, setEditAlbumTitle] = useState("");
 
   const handleCreateAlbum = () => {
-    if (newAlbumTitle.trim()) {
-      addAlbum(newAlbumTitle.trim());
-      setNewAlbumTitle("");
-      setDialogOpen(false);
-      onAlbumsChange();
-    }
+    addAlbum();
+    onAlbumsChange();
   };
 
   const handleDeleteAlbum = (id: string, e: React.MouseEvent) => {
@@ -35,29 +32,47 @@ const AlbumGrid = ({ albums, onAlbumsChange }: AlbumGridProps) => {
     }
   };
 
+  const handleEditAlbum = (album: Album, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCurrentAlbum(album);
+    setEditAlbumTitle(album.title);
+    setEditDialogOpen(true);
+  };
+
+  const saveAlbumTitle = () => {
+    if (currentAlbum && editAlbumTitle.trim()) {
+      updateAlbumTitle(currentAlbum.id, editAlbumTitle.trim());
+      setEditDialogOpen(false);
+      onAlbumsChange();
+    }
+  };
+
   return (
-    <div className="my-6">
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <button className="flex flex-col items-center justify-center bg-secondary/60 rounded-lg aspect-square hover:bg-secondary transition-colors duration-200">
-              <PlusIcon className="h-12 w-12 text-primary" />
-              <span className="mt-2 font-medium">Создать альбом</span>
-            </button>
-          </DialogTrigger>
+    <div className="my-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+        <button 
+          onClick={handleCreateAlbum}
+          className="flex flex-col items-center justify-center bg-secondary/60 rounded-lg aspect-square hover:bg-secondary transition-colors duration-200"
+        >
+          <PlusIcon className="h-10 w-10 text-primary" />
+          <span className="mt-2 font-medium text-sm">Создать альбом</span>
+        </button>
+        
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Новый альбом</DialogTitle>
+              <DialogTitle>Редактировать название альбома</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-2">
               <Input
                 placeholder="Название альбома"
-                value={newAlbumTitle}
-                onChange={(e) => setNewAlbumTitle(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleCreateAlbum()}
+                value={editAlbumTitle}
+                onChange={(e) => setEditAlbumTitle(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && saveAlbumTitle()}
               />
-              <Button onClick={handleCreateAlbum} className="w-full">
-                Создать
+              <Button onClick={saveAlbumTitle} className="w-full">
+                Сохранить
               </Button>
             </div>
           </DialogContent>
@@ -85,14 +100,24 @@ const AlbumGrid = ({ albums, onAlbumsChange }: AlbumGridProps) => {
                 <span className="text-white font-medium truncate">
                   {album.title}
                 </span>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="text-white hover:text-destructive ml-2"
-                  onClick={(e) => handleDeleteAlbum(album.id, e)}
-                >
-                  <TrashIcon className="h-4 w-4" />
-                </Button>
+                <div className="flex">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-white hover:text-primary ml-1"
+                    onClick={(e) => handleEditAlbum(album, e)}
+                  >
+                    <EditIcon className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-white hover:text-destructive ml-1"
+                    onClick={(e) => handleDeleteAlbum(album.id, e)}
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               <div className="text-sm text-white/80">
                 {album.photoCount} фото

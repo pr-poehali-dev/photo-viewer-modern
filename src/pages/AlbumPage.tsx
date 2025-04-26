@@ -1,12 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import ViewModeSelector from "@/components/ViewModeSelector";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ChevronLeft, SearchIcon } from "lucide-react";
+import { ChevronLeft, Upload, ImageIcon } from "lucide-react";
 import { Photo, ViewMode, Album } from "@/types";
-import { getPhotosByAlbumId, getAlbums } from "@/data/mockData";
+import { getPhotosByAlbumId, getAlbums, addPhotoToAlbum } from "@/data/mockData";
 
 const AlbumPage = () => {
   const { albumId } = useParams<{ albumId: string }>();
@@ -14,28 +13,65 @@ const AlbumPage = () => {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [album, setAlbum] = useState<Album | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [search, setSearch] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     if (albumId) {
-      const albumPhotos = getPhotosByAlbumId(albumId);
-      setPhotos(albumPhotos);
-      
-      const albums = getAlbums();
-      const currentAlbum = albums.find(a => a.id === albumId) || null;
-      setAlbum(currentAlbum);
+      loadAlbumData();
     }
   }, [albumId]);
 
-  const filteredPhotos = photos.filter(photo => 
-    photo.title.toLowerCase().includes(search.toLowerCase())
-  );
+  const loadAlbumData = () => {
+    if (!albumId) return;
+    
+    const albumPhotos = getPhotosByAlbumId(albumId);
+    setPhotos(albumPhotos);
+    
+    const albums = getAlbums();
+    const currentAlbum = albums.find(a => a.id === albumId) || null;
+    setAlbum(currentAlbum);
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!albumId || !event.target.files?.length) return;
+    
+    setIsUploading(true);
+    const files = Array.from(event.target.files);
+    const promises = files.map(file => {
+      return new Promise<void>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (e.target?.result && typeof e.target.result === "string") {
+            addPhotoToAlbum(albumId, {
+              title: file.name.split('.')[0] || "Фото без названия",
+              url: e.target.result
+            });
+            resolve();
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+
+    Promise.all(promises).then(() => {
+      setIsUploading(false);
+      loadAlbumData();
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    });
+  };
+
+  const uploadButtonClick = () => {
+    fileInputRef.current?.click();
+  };
 
   const renderPhotoGrid = () => {
     if (viewMode === "grid") {
       return (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-          {filteredPhotos.map(photo => (
+          {photos.map(photo => (
             <Link to={`/album/${albumId}/photo/${photo.id}`} key={photo.id} className="group">
               <div className="relative aspect-square rounded-sm overflow-hidden">
                 <img 
@@ -56,7 +92,7 @@ const AlbumPage = () => {
     } else if (viewMode === "masonry") {
       return (
         <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 gap-2 space-y-2">
-          {filteredPhotos.map(photo => (
+          {photos.map(photo => (
             <Link to={`/album/${albumId}/photo/${photo.id}`} key={photo.id} className="block group">
               <div className="relative overflow-hidden rounded-sm break-inside-avoid">
                 <img 
@@ -77,7 +113,7 @@ const AlbumPage = () => {
     } else {
       return (
         <div className="flex flex-col space-y-2">
-          {filteredPhotos.map(photo => (
+          {photos.map(photo => (
             <Link to={`/album/${albumId}/photo/${photo.id}`} key={photo.id} className="group">
               <div className="flex items-center p-2 rounded-md hover:bg-secondary/60">
                 <div className="w-16 h-16 rounded overflow-hidden mr-3">
@@ -119,21 +155,31 @@ const AlbumPage = () => {
         </div>
         
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <div className="relative w-full sm:w-64">
-            <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Поиск фотографий..."
-              className="pl-8"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+          <div className="flex gap-2">
+            <Button onClick={uploadButtonClick} disabled={isUploading}>
+              <Upload className="h-4 w-4 mr-2" />
+              {isUploading ? "Загрузка..." : "Загрузить фото"}
+            </Button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept="image/*" 
+              multiple 
+              onChange={handleFileUpload} 
             />
           </div>
           <ViewModeSelector currentMode={viewMode} onChange={setViewMode} />
         </div>
         
         {photos.length === 0 ? (
-          <div className="text-center py-12">
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <ImageIcon className="h-16 w-16 text-muted-foreground mb-4" />
             <p className="text-muted-foreground mb-4">В этом альбоме пока нет фотографий</p>
+            <Button onClick={uploadButtonClick}>
+              <Upload className="h-4 w-4 mr-2" />
+              Загрузить фото
+            </Button>
           </div>
         ) : (
           renderPhotoGrid()

@@ -81,17 +81,26 @@ export const getPhotosByAlbumId = (albumId: string): Photo[] => {
   return allPhotos.filter(photo => photo.albumId === albumId);
 };
 
-export const addAlbum = (title: string): Album => {
+export const addAlbum = (): Album => {
   const albums = getAlbums();
+  const newAlbumNumber = albums.length + 1;
   const newAlbum: Album = {
     id: generateId(),
-    title,
+    title: `Новый альбом ${newAlbumNumber}`,
     timestamp: Date.now(),
     photoCount: 0
   };
   
   saveAlbums([...albums, newAlbum]);
   return newAlbum;
+};
+
+export const updateAlbumTitle = (albumId: string, newTitle: string): void => {
+  const albums = getAlbums();
+  const updatedAlbums = albums.map(album => 
+    album.id === albumId ? { ...album, title: newTitle } : album
+  );
+  saveAlbums(updatedAlbums);
 };
 
 export const deleteAlbum = (albumId: string) => {
@@ -103,4 +112,37 @@ export const deleteAlbum = (albumId: string) => {
   const photos = getPhotos();
   const updatedPhotos = photos.filter(photo => photo.albumId !== albumId);
   savePhotos(updatedPhotos);
+};
+
+export const addPhotoToAlbum = (albumId: string, photo: Omit<Photo, 'id' | 'albumId' | 'timestamp'>): Photo => {
+  const photos = getPhotos();
+  const newPhoto: Photo = {
+    id: generateId(),
+    albumId,
+    timestamp: Date.now(),
+    ...photo
+  };
+  
+  const updatedPhotos = [...photos, newPhoto];
+  savePhotos(updatedPhotos);
+  
+  // Обновляем количество фото в альбоме
+  const albums = getAlbums();
+  const updatedAlbums = albums.map(album => {
+    if (album.id === albumId) {
+      // Если это первое фото, установим его как обложку
+      if (album.photoCount === 0 && !album.coverUrl) {
+        return { 
+          ...album, 
+          photoCount: album.photoCount + 1,
+          coverUrl: photo.url
+        };
+      }
+      return { ...album, photoCount: album.photoCount + 1 };
+    }
+    return album;
+  });
+  saveAlbums(updatedAlbums);
+  
+  return newPhoto;
 };
